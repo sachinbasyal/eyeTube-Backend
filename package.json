@@ -1,0 +1,15 @@
+{
+  "name": "eyetube-backend",
+  "version": "1.0.0",
+  "description": "eyetube backend codes",
+  "main": "index.js",
+  "scripts": {
+    "start":"node index.js"
+  },
+  "keywords": [
+    "eyetube",
+    "backend"
+  ],
+  "author": "sachinbasyal",
+  "license": "ISC"
+}

@@ -1,4 +1,4 @@
-//require('dotenv').config({path: './env'}) // common JS  style
+//require('dotenv').config() // common JS  style
 import 'dotenv/config' // module JS
 import connectDB from './db/index.js'
 import {app} from './app.js'

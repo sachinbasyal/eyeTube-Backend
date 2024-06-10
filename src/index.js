@@ -1,11 +1,18 @@
 //require('dotenv').config({path: './env'}) // common JS  style
-import dotenv from 'dotenv' // module JS
+import 'dotenv/config' // module JS
 import connectDB from './db/index.js'
+import {app} from './app.js'
 
 
-dotenv.config({path:'./env'})
-
-connectDB(); //connnect to MongoDB 
+connectDB()
+.then(()=>{
+  app.listen(process.env.PORT || 3000, ()=>{
+    console.log(`Server is listening at port: ${process.env.port}`);
+  })
+})
+.catch((error)=>{
+  console.log('MongoDB FAILED!!! ', error);
+}); //connnect to MongoDB 
 
 
 /* 1st Method to connect DB
@@ -27,7 +34,7 @@ IIFE ()();
     })
 
     app.listen(process.env.PORT, ()=>{
-      console.log(`App is listening on port ${process.env.PORT} `);
+      console.log(`/n App is listening at port ${process.env.PORT} `);
     })
 
   } catch (error) {

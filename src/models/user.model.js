@@ -50,7 +50,7 @@ const userSchema = new Schema(
 // using mongoose pre hook and bcrypt for encrypting the password
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  this.password = bcrypt.hash(this.password, 10); // salt - no. of hash rounds: 10
+  this.password = await bcrypt.hash(this.password, 10); // salt - no. of hash rounds: 10
   next();
 });
 

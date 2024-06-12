@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/fileHandling.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import fs from "fs";
 
 const registerUser = asyncHandler(async (req, res) => {
   /*  Steps:
@@ -34,9 +35,18 @@ const registerUser = asyncHandler(async (req, res) => {
   if (existedUser) {
     throw new ApiError(409, "User with username or email already exists");
   }
-// console.log(req.files) 
+
+  // console.log(req.files)
   const avatarLocalPath = req.files?.avatar[0]?.path;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  // const coverImageLocalPath = req.files?.coverImage[0]?.path;
+  let coverImageLocalPath;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
+  } // coverImage is optional
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar path is missing");
@@ -44,7 +54,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const avatar = await uploadOnCloudinary(avatarLocalPath);
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-  // onsole.log(avatar)
+  // console.log(avatar)
 
   if (!avatar) {
     throw new ApiError(400, "Avatar is required");
@@ -61,7 +71,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken"
-  );  // remove the password and refresh token fields from the response
+  ); // check if the user is created and remove the password and refresh token fields for response
 
   if (!createdUser) {
     throw new ApiError(

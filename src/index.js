@@ -1,8 +1,10 @@
 //require('dotenv').config() // common JS  style
-import 'dotenv/config' // module JS
+import dotenv from "dotenv" // module JS
 import connectDB from './db/index.js'
 import {app} from './app.js'
 
+
+dotenv.config({path:"./.env"})
 
 connectDB()
 .then(()=>{

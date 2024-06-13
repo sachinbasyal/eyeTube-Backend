@@ -206,10 +206,11 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "User logged out successfully"));
 });
 
+// handle Refresh Access Token endpoint
 const refreshAccessToken = asyncHandler(async (req, res) => {
-  // from mobile apps
+  
   const incomingRefreshToken =
-    req.cookies.refreshToken || req.body.refreshToken;
+    req.cookies.refreshToken || req.body.refreshToken; // req.body: ~from mobile apps
 
   if (!incomingRefreshToken) {
     throw new ApiError(401, "Unauthorized request!");

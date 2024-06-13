@@ -168,7 +168,7 @@ const loginUser = asyncHandler(async (req, res) => {
   }; // here, cookie can't be modified in frontend and can only be modified by server
 
   return res
-    .status(201)
+    .status(200)
     .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", refreshToken, options)
     .json(
@@ -235,22 +235,22 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       );
     }
 
-    const { accessToken, newRefreshToken } =
+    const { accessToken, refreshToken } =
       await generateRefreshAndAccessTokens(user._id);
 
     const options = {
       httpOnly: true,
-      secure: true,
+      secure: true
     };
 
     return res
-      .status(201)
+      .status(200)
       .cookie("accessToken", accessToken, options)
-      .cookie("refreshToken", newRefreshToken, options)
+      .cookie("refreshToken", refreshToken, options)
       .json(
         new ApiResponse(
           200,
-          { accessToken, refreshToken: newRefreshToken },
+          { accessToken, refreshToken },
           "Access Token refreshed"
         )
       );
@@ -259,4 +259,29 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+// change password
+const changeCurrentPassword = asyncHandler(async (req,res)=>{
+
+  const {oldPassword, newPassword, confirmPassword} = req.body
+
+  if (!(newPassword===confirmPassword)) {
+    throw new ApiError(401, "Please check if the new and confirm passwords are matched")
+  }
+  
+  const user = await User.findById(req.user?._id)
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+
+  if(!isPasswordCorrect) {
+    throw new ApiError(400, "Invalid password")
+  }
+
+  user.password = newPassword;
+  await user.save({validateBeforeSave: false});
+
+  return res
+  .status(200)
+  .json(new ApiResponse(200, {}, "Password is changed successfully!"))
+
+})
+
+export { registerUser, loginUser, logoutUser, refreshAccessToken, changeCurrentPassword };

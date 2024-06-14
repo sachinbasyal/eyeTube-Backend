@@ -5,6 +5,7 @@ import { uploadOnCloudinary } from "../utils/fileHandling.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import fs from "fs";
+import { channel } from "diagnostics_channel";
 
 const generateRefreshAndAccessTokens = async (userId) => {
   try {
@@ -297,95 +298,166 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 // update account details
-const updateAccountDetails = asyncHandler(async(req,res)=>{
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  const { fullname, email } = req.body; // get those fields that are relevant to update
 
-  const {fullname, email} = req.body  // get those fields that are relevant to update
-
-  if(!(fullname || email)) {
-    throw new ApiError(401, "All fields are required" )
+  if (!(fullname || email)) {
+    throw new ApiError(401, "All fields are required");
   }
 
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
-      $set:{
+      $set: {
         fullname,
-        email
-      }
+        email,
+      },
     },
-    {new: true} // returns new updated data
-  ).select("-password")
+    { new: true } // returns new updated data
+  ).select("-password");
 
   return res
-  .status(200)
-  .json(new ApiResponse(
-    200, user, "Account details updaed successfully"
-  ))
-
-})
+    .status(200)
+    .json(new ApiResponse(200, user, "Account details updaed successfully"));
+});
 
 // update user avatar
-const updateUserAvatar = asyncHandler(async(req,res)=>{
-  const avatarLocalPath = req.file?.path
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
 
-  if(!avatarLocalPath) {
-    throw new ApiError(401, "Avatar file is missing")
+  if (!avatarLocalPath) {
+    throw new ApiError(401, "Avatar file is missing");
   }
 
-  const avatar = await uploadOnCloudinary(avatarLocalPath)
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-  if(!avatar.secure_url) throw new ApiError(401, "Error while uploading avatar")
+  if (!avatar.secure_url)
+    throw new ApiError(401, "Error while uploading avatar");
 
-    const user = await User.findByIdAndUpdate(
-      req.user?._id,
-      {
-        $set: {
-          avatar: avatar.secure_url
-        }
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: avatar.secure_url,
       },
-      {new: true}
-    ).select("-password")
+    },
+    { new: true }
+  ).select("-password");
 
-    //TODO: need to delete old avatar image URL from the dB
+  //TODO: need to delete old avatar image URL from the dB
 
-    return res
+  return res
     .status(400)
-    .json(new ApiResponse(
-      200, user, "Avatar is updated successfully"
-    ))
-})
+    .json(new ApiResponse(200, user, "Avatar is updated successfully"));
+});
 
 // update coverImage
-const updateCoverImage = asyncHandler(async(req,res)=>{
-  const coverImageLocalPath = req.file?.path
+const updateCoverImage = asyncHandler(async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
 
-  if(!coverImageLocalPath) {
-    throw new ApiError(401, "Cover image file is missing")
+  if (!coverImageLocalPath) {
+    throw new ApiError(401, "Cover image file is missing");
   }
- 
-  const coverImage = await uploadOnCloudinary(avatarLocalPath)
 
-  if(!coverImage.secure_url) throw new ApiError(401, "Error while uploading cover image")
+  const coverImage = await uploadOnCloudinary(avatarLocalPath);
 
-    const user = await User.findByIdAndUpdate(
-      req.user?._id,
-      {
-        $set: {
-          coverImage: coverImage.secure_url
-        }
+  if (!coverImage.secure_url)
+    throw new ApiError(401, "Error while uploading cover image");
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        coverImage: coverImage.secure_url,
       },
-      {new: true}
-    ).select("-password")
+    },
+    { new: true }
+  ).select("-password");
 
-     //TODO: need to delete old cover image URL from the dB
+  //TODO: need to delete old cover image URL from the dB
 
-    return res
+  return res
     .status(400)
-    .json(new ApiResponse(
-      200, user, "Cover image is updated successfully"
-    ))
-})
+    .json(new ApiResponse(200, user, "Cover image is updated successfully"));
+});
 
+// get user channel profile
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(404, "username is missing");
+  }
+
+  // create aggregation pipelines in MongoDB
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username:username
+      }
+    },
+    {
+      $lookup:{
+        from: "subscriptions",  // from  subscriptions document (~collection/table in MongoDB)
+        localField:"_id",
+        foreignField:"channel",
+        as: "subscribers" // result
+      }
+    },
+    {
+      $lookup:{
+        from: "subscriptions", 
+        localField:"_id",
+        foreignField:"subscriber",
+        as: "subscribedTo"
+      }
+    },
+    {
+      $addFields:{
+        subscribersCount:{
+          size:$subscribers
+        },
+        channelsSubscribedToCount:{
+          size:$subscribedTo
+        },
+        isSubscribed:{
+          $cond:{
+            if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+            then:true,
+            else: false,
+            avatar:1,
+            coverImage:1,
+            email:1
+          }
+        }
+      }
+     },
+     {
+      $project:{
+        fullname:1,
+        username:1,
+        subscribersCount:1,
+        channelsSubscribedToCount:1,
+        isSubscribed:1,
+
+
+
+      }
+
+     }
+  ]);
+
+console.log(channel);
+
+if (!channel?.length) {
+  throw new ApiError(404, "Channel does not exists!")
+}
+
+return res
+.status(201)
+.json(new ApiResponse(201, channel[0], "User's channel profile fetched successfully"))
+
+});
 
 export {
   registerUser,
@@ -393,5 +465,8 @@ export {
   logoutUser,
   refreshAccessToken,
   changeCurrentPassword,
-  getCurrentUser, updateAccountDetails, updateUserAvatar, updateCoverImage
+  getCurrentUser,
+  updateAccountDetails,
+  updateUserAvatar,
+  updateCoverImage,
 };

@@ -1,7 +1,10 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/fileHandling.js";
+import {
+  deleteAssetCloudinary,
+  uploadOnCloudinary,
+} from "../utils/fileHandling.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
@@ -68,8 +71,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User with username or email already exists");
   }
 
-  // console.log(req.files)
-  const avatarLocalPath = req.files?.avatar[0]?.path;
+  const avatarLocalPath = req.files?.avatar?.[0]?.path;
   const coverImageLocalPath = req.files?.coverImage?.[0]?.path; // ensure coverImage exists before trying to access its index
   /* alternative - classic style
   let coverImageLocalPath;
@@ -95,6 +97,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const user = await User.create({
     fullname,
+    // avatar: {
+    //   url: avatar.secure_url,
+    //   public_id: avatar.public_id
+    // },
     avatar: avatar.secure_url,
     coverImage: coverImage?.secure_url || "",
     password,
@@ -302,7 +308,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
   const { fullname, email } = req.body; // get those fields that are relevant to update
 
   if (!(fullname || email)) {
-    throw new ApiError(401, "All fields are required");
+    throw new ApiError(401, "Full Name and Email fields are required");
   }
 
   const user = await User.findByIdAndUpdate(
@@ -314,11 +320,11 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
       },
     },
     { new: true } // returns new updated data
-  ).select("-password");
+  ).select("-password -refreshToken");
 
   return res
     .status(200)
-    .json(new ApiResponse(200, user, "Account details updaed successfully"));
+    .json(new ApiResponse(200, user, "Account details updated successfully"));
 });
 
 // update user avatar
@@ -334,47 +340,58 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   if (!avatar.secure_url)
     throw new ApiError(401, "Error while uploading avatar");
 
+  const oldImageURL = req.user?.avatar;
+
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
+      // $set: {
+      //   avatar: {
+      //     url: avatar.secure_url,
+      //     public_id: avatar.public_id
+      //   }
+      // },
       $set: {
-        avatar: avatar.secure_url,
-      },
+        avatar: avatar.secure_url
+      }
     },
     { new: true }
-  ).select("-password");
+  ).select("-password -refreshToken");
 
-  //TODO: need to delete old avatar image URL from the dB
+  // delete old avatar image from Cloudinary
+  deleteAssetCloudinary(oldImageURL);
 
   return res
     .status(400)
     .json(new ApiResponse(200, user, "Avatar is updated successfully"));
 });
 
-// update coverImageS
+// update coverImage
 const updateCoverImage = asyncHandler(async (req, res) => {
   const coverImageLocalPath = req.file?.path;
 
   if (!coverImageLocalPath) {
     throw new ApiError(401, "Cover image file is missing");
   }
+  
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  const coverImage = await uploadOnCloudinary(avatarLocalPath);
+  if (!coverImage.secure_url) throw new ApiError(401, "Error while uploading cover image");
 
-  if (!coverImage.secure_url)
-    throw new ApiError(401, "Error while uploading cover image");
+  const oldImageURL= req.user?.coverImage;
 
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
-        coverImage: coverImage.secure_url,
+        coverImage: coverImage.secure_url
       },
     },
     { new: true }
   ).select("-password");
 
-  //TODO: need to delete old cover image URL from the dB
+  //delete old cover image from the Cloudinary
+  deleteAssetCloudinary(oldImageURL);
 
   return res
     .status(400)

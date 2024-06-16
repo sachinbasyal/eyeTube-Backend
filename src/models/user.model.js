@@ -25,12 +25,18 @@ const userSchema = new Schema(
       trim: true,
       index: true,
     },
-    avatar: {
-      type: String, // cloudinary URL
-      required: true,
+    // avatar: {
+    //   type: {
+    //     url: String, // cloudinary URL
+    //     public_id: String,
+    //   },
+    //   required: true,
+    // },
+    avatar:{
+      type: String // cloudinary image URL
     },
     coverImage: {
-      type: String, // cloudinary URL
+      type: String, // cloudinary image URL
     },
     watchHistory: {
       type: Schema.Types.ObjectId,
@@ -65,7 +71,7 @@ userSchema.methods.generateAccessToken = function () {
     {
       _id: this._id,
       email: this.email,
-      username: this.username
+      username: this.username,
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
@@ -77,7 +83,7 @@ userSchema.methods.generateAccessToken = function () {
 userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     {
-      _id: this._id
+      _id: this._id,
     },
     process.env.REFRESH_TOKEN_SECRET,
     {
@@ -85,6 +91,5 @@ userSchema.methods.generateRefreshToken = function () {
     }
   );
 };
-
 
 export const User = mongoose.model("User", userSchema);

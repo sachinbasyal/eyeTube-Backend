@@ -193,8 +193,12 @@ const logoutUser = asyncHandler(async (req, res) => {
     req.user._id,
     {
       $set: {
-        refreshToken: undefined,
-      },
+        refreshToken: undefined, 
+      }
+      // Alt. if undefined doesn't work
+      // $unset: {
+      //   refreshToken: 1 // this removes field from document
+      // }
     },
     {
       new: true,
@@ -406,7 +410,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     throw new ApiError(404, "username is missing");
   }
 
-  // create aggregation pipelines in MongoDB
+  // create aggregation pipelines in MongoDB -> returns an array!
   const channel = await User.aggregate([
     {
       $match: {
@@ -432,10 +436,10 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     {
       $addFields: {
         subscribersCount: {
-          size: $subscribers,
+          size: "$subscribers",
         },
         channelsSubscribedToCount: {
-          size: $subscribedTo,
+          size: "$subscribedTo",
         },
         isSubscribed: {
           $cond: {
@@ -460,8 +464,6 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     },
   ]);
 
-  console.log(channel);
-
   if (!channel?.length) {
     throw new ApiError(404, "Channel does not exists!");
   }
@@ -482,7 +484,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
       $match: {
-        _id: new mongoose.Types.ObjectId.createFromTime(req.user._id),
+        _id: new mongoose.Types.ObjectId(req.user._id),
       },
     },
     {

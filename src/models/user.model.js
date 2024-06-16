@@ -7,7 +7,7 @@ const userSchema = new Schema(
     username: {
       type: String,
       unique: true,
-      required: true,
+      required: [true, "username is required"],
       lowercase: true,
       trim: true,
       index: true, // for search optimizations
@@ -15,7 +15,7 @@ const userSchema = new Schema(
     email: {
       type: String,
       unique: true,
-      required: true,
+      required: [true, "email is required"],
       lowercase: true,
       trim: true,
     },
@@ -26,22 +26,25 @@ const userSchema = new Schema(
       index: true,
     },
     // avatar: {
-    //   type: {
+    //   type:{
     //     url: String, // cloudinary URL
     //     public_id: String,
     //   },
     //   required: true,
     // },
-    avatar:{
-      type: String // cloudinary image URL
+    avatar: {
+      type: String, // cloudinary image URL
+      required: true,
     },
     coverImage: {
       type: String, // cloudinary image URL
     },
-    watchHistory: {
-      type: Schema.Types.ObjectId,
-      ref: "Video",
-    },
+    watchHistory: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Video",
+      },
+    ],
     password: {
       type: String,
       required: [true, "Password is required!"],

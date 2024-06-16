@@ -18,8 +18,7 @@ import { verifyJWT } from "../middlewares/auth.middleware.js";
 const router = Router();
 
 router.route("/register").post(
-  upload.fields([
-    // add middleware just before executing registerUser method
+  upload.fields([  // add middleware just before executing registerUser method
     {
       name: "avatar",
       maxCount: 1,

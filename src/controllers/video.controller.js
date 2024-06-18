@@ -130,7 +130,8 @@ const getVideoById = asyncHandler(async (req, res) => {
               username: 1,
               avatar: 1,
               subscribersCount:1,
-              isSubscribed:1
+              isSubscribed:1,
+              createdAt:1
             }
           },
         ],

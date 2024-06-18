@@ -344,7 +344,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   if (!avatar.secure_url)
     throw new ApiError(401, "Error while uploading avatar");
 
-  const oldImageURL = req.user?.avatar;
+  const oldAvatarURL = req.user?.avatar;
 
   const user = await User.findByIdAndUpdate(
     req.user?._id,
@@ -362,8 +362,13 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password -refreshToken");
 
+  if(!user) {
+    throw new ApiError(500, "Error while updating cover image in DB server")
+  }
   // delete old avatar image from Cloudinary
-  deleteAssetCloudinary(oldImageURL);
+  if(user) {
+    await deleteAssetCloudinary(oldAvatarURL);
+  }
 
   return res
     .status(400)
@@ -395,8 +400,14 @@ const updateCoverImage = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password");
 
+  if(!user) {
+    throw new ApiError(500, "Error while updating cover image in DB server")
+  }
+
   //delete old cover image from the Cloudinary
-  deleteAssetCloudinary(oldImageURL);
+  if(user) {
+    await deleteAssetCloudinary(oldImageURL);
+  }
 
   return res
     .status(400)

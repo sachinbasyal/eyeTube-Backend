@@ -2,6 +2,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { Video } from "../models/video.model.js";
 import { User } from "../models/user.model.js";
+import { Like } from "../models/like.model.js";
+import { Comment } from "../models/comment.model.js";
 import {
   deleteAssetCloudinary,
   uploadOnCloudinary,
@@ -22,8 +24,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Both title and description fields are required");
   }
 
-  const videoLocalPath = req.files?.videoFile[0].path;
-  const thumbnailLocalPath = req.files?.thumbnail[0].path;
+  const videoLocalPath = req.files?.videoFile?.[0]?.path;
+  const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path;
 
   if (!videoLocalPath) {
     throw new ApiError(400, "Video file's local path is missing");
@@ -176,12 +178,14 @@ const getVideoById = asyncHandler(async (req, res) => {
   if (!video) {
     throw new ApiError(404, "Video file not found");
   }
-  // increment views if video is fetched successfully
-  await Video.findByIdAndUpdate(videoId, {
-    $inc: {
-      views: 1,
-    },
-  });
+  // increment views if the video is fetched successfully ~by user(s) other than owner
+  if (req.user?._id.toString() !== video[0]?.owner._id.toString()) {
+    await Video.findByIdAndUpdate(videoId, {
+      $inc: {
+        views: 1,
+      },
+    });
+  }
   // add this video to user's watch history
   await User.findByIdAndUpdate(req.user?._id, {
     $addToSet: {
@@ -214,11 +218,8 @@ const updateVideo = asyncHandler(async (req, res) => {
   if (!video) throw new ApiError(401, "Video file is missing!");
 
   if (video?.owner.toString() !== req.user?._id.toString()) {
-    throw new ApiError(
-        400,
-        "Video editing is restricted"
-    );
-}
+    throw new ApiError(400, "Video editing is restricted");
+  }
 
   const thumbnailLocalPath = req.file?.path || "";
   const currentThumbnailURL = video.thumbnail;
@@ -226,22 +227,25 @@ const updateVideo = asyncHandler(async (req, res) => {
   const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
 
   const updatedVideo = await Video.findByIdAndUpdate(
-    videoId, 
+    videoId,
     {
       $set: {
         title,
         description,
-        thumbnail: thumbnail?.secure_url || currentThumbnailURL, //thumbnail update is optional
-      }
+        thumbnail: thumbnail?.secure_url || currentThumbnailURL, //thumbnail update may be optional
+      },
     },
-    { new:true }
+    { new: true }
   );
 
   if (!updatedVideo) {
-    throw new ApiError(500, "Error while updating a video file in the DB server");
+    throw new ApiError(
+      500,
+      "Error while updating a video file in the DB server"
+    );
   }
   //deleteing the old thumbnail from the Cloudinary if update is available
-  if (thumbnailLocalPath !== "") {
+  if (updatedVideo && thumbnailLocalPath !== "") {
     await deleteAssetCloudinary(currentThumbnailURL);
   }
 
@@ -255,6 +259,42 @@ const updateVideo = asyncHandler(async (req, res) => {
 // delete video
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(401, "Invalid Video ID");
+  }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) throw new ApiError(400, "Video file not found");
+
+  const videoURL = video.videoFile;
+  const thumbnailURL = video.thumbnail;
+
+  if (video?.owner.toString() !== req.user?._id.toString()) {
+    throw new ApiError(401, "Video deletion is restricted");
+  }
+  const deleteVideo = await Video.findByIdAndDelete(video?._id);
+  console.log("delete Video:", deleteVideo);
+
+  if (!deleteVideo) {
+    throw new ApiError(500, "Unable to delete a video in the server.");
+  }
+  if (deleteVideo) {
+    await deleteAssetCloudinary(videoURL, "video"); // specify video-{resource_type} while deleting a video
+    await deleteAssetCloudinary(thumbnailURL);
+  }
+  // delete video likes
+  await Like.deleteMany({
+    video: videoId,
+  });
+
+  // delete video comments
+  await Comment.deleteMany({
+    video: videoId,
+  });
+
+  return res.status(200).json(new ApiResponse(200, {}, "Video is deleted."));
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {

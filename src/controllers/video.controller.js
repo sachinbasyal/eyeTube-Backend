@@ -69,7 +69,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
 // get video by id
 const getVideoById = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
-  
+
   if (!isValidObjectId(videoId)) {
     throw new ApiError(400, "Invalid Video ID");
   }
@@ -129,10 +129,10 @@ const getVideoById = asyncHandler(async (req, res) => {
               fullname: 1,
               username: 1,
               avatar: 1,
-              subscribersCount:1,
-              isSubscribed:1,
-              createdAt:1
-            }
+              subscribersCount: 1,
+              isSubscribed: 1,
+              createdAt: 1,
+            },
           },
         ],
       },
@@ -179,15 +179,15 @@ const getVideoById = asyncHandler(async (req, res) => {
   // increment views if video is fetched successfully
   await Video.findByIdAndUpdate(videoId, {
     $inc: {
-        views: 1
-    }
-});
+      views: 1,
+    },
+  });
   // add this video to user's watch history
-   await User.findByIdAndUpdate(req.user?._id, {
+  await User.findByIdAndUpdate(req.user?._id, {
     $addToSet: {
-        watchHistory: videoId
-    }
-});
+      watchHistory: videoId,
+    },
+  });
 
   return res
     .status(200)
@@ -197,6 +197,59 @@ const getVideoById = asyncHandler(async (req, res) => {
 // update video details like title, description, thumbnail
 const updateVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+  const { title, description } = req.body;
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid Video ID");
+  }
+
+  if (!(title && description)) {
+    throw new ApiError(
+      400,
+      "Title and description fields are required for the updates"
+    );
+  }
+
+  const video = await Video.findById(videoId);
+  if (!video) throw new ApiError(401, "Video file is missing!");
+
+  if (video?.owner.toString() !== req.user?._id.toString()) {
+    throw new ApiError(
+        400,
+        "Video editing is restricted"
+    );
+}
+
+  const thumbnailLocalPath = req.file?.path || "";
+  const currentThumbnailURL = video.thumbnail;
+
+  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+
+  const updatedVideo = await Video.findByIdAndUpdate(
+    videoId, 
+    {
+      $set: {
+        title,
+        description,
+        thumbnail: thumbnail?.secure_url || currentThumbnailURL, //thumbnail update is optional
+      }
+    },
+    { new:true }
+  );
+
+  if (!updatedVideo) {
+    throw new ApiError(500, "Error while updating a video file in the DB server");
+  }
+  //deleteing the old thumbnail from the Cloudinary if update is available
+  if (thumbnailLocalPath !== "") {
+    await deleteAssetCloudinary(currentThumbnailURL);
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updatedVideo, "Video file is updated successfully")
+    );
 });
 
 // delete video

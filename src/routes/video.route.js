@@ -20,11 +20,11 @@ router
     verifyJWT,
     upload.fields([
       {
-        name: videoFile,
+        name: "videoFile",
         maxCount: 1,
       },
       {
-        name: thumbnail,
+        name: "thumbnail",
         maxCount: 1,
       },
     ]),

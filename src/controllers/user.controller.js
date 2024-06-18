@@ -120,8 +120,8 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   return res
-  .status(201)
-  .json(new ApiResponse(200, createdUser, "User registered successfully"));
+    .status(201)
+    .json(new ApiResponse(200, createdUser, "User registered successfully"));
 });
 
 // User login
@@ -193,8 +193,8 @@ const logoutUser = asyncHandler(async (req, res) => {
     req.user._id,
     {
       $set: {
-        refreshToken: undefined, 
-      }
+        refreshToken: undefined,
+      },
       // Alt. if undefined doesn't work
       // $unset: {
       //   refreshToken: 1 // this removes field from document
@@ -356,8 +356,8 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
       //   }
       // },
       $set: {
-        avatar: avatar.secure_url
-      }
+        avatar: avatar.secure_url,
+      },
     },
     { new: true }
   ).select("-password -refreshToken");
@@ -377,18 +377,19 @@ const updateCoverImage = asyncHandler(async (req, res) => {
   if (!coverImageLocalPath) {
     throw new ApiError(401, "Cover image file is missing");
   }
-  
+
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if (!coverImage.secure_url) throw new ApiError(401, "Error while uploading cover image");
+  if (!coverImage.secure_url)
+    throw new ApiError(401, "Error while uploading cover image");
 
-  const oldImageURL= req.user?.coverImage;
+  const oldImageURL = req.user?.coverImage;
 
   const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
-        coverImage: coverImage.secure_url
+        coverImage: coverImage.secure_url,
       },
     },
     { new: true }
@@ -419,10 +420,10 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     },
     {
       $lookup: {
-        from: "subscriptions", // from  subscriptions document (~collection/table in MongoDB)
-        localField: "_id",
-        foreignField: "channel",
-        as: "subscribers", // result
+        from: "subscriptions", // collection (subscriptions) to join with
+        localField: "_id", // field from the current collection (users) to match
+        foreignField: "channel", //  field from the 'subscriptions' collection to match
+        as: "subscribers", // alias for the joined data
       },
     },
     {
@@ -503,7 +504,7 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               as: "owner",
               pipeline: [
                 {
-                  $project: {
+                  $project: {  // overwrite owner field in 'videos' document with projected details
                     fullname: 1,
                     username: 1,
                     avatar: 1,

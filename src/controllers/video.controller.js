@@ -14,6 +14,8 @@ import mongoose, { isValidObjectId } from "mongoose";
 // get all videos based on query, sort, pagination
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+  
+
 });
 
 // get video, upload to cloudinary, publish video
@@ -28,11 +30,11 @@ const publishAVideo = asyncHandler(async (req, res) => {
   const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path;
 
   if (!videoLocalPath) {
-    throw new ApiError(400, "Video file's local path is missing");
+    throw new ApiError(400, "Video file local path is missing");
   }
 
   if (!thumbnailLocalPath) {
-    throw new ApiError(400, "Thumbnail's local path is missing");
+    throw new ApiError(400, "Thumbnail local path is missing");
   }
 
   const videoFile = await uploadOnCloudinary(videoLocalPath);
@@ -132,8 +134,7 @@ const getVideoById = asyncHandler(async (req, res) => {
               username: 1,
               avatar: 1,
               subscribersCount: 1,
-              isSubscribed: 1,
-              createdAt: 1,
+              isSubscribed: 1
             },
           },
         ],
@@ -171,6 +172,7 @@ const getVideoById = asyncHandler(async (req, res) => {
         duration: 1,
         views: 1,
         isLiked: 1,
+        createdAt: 1
       },
     },
   ]);
@@ -218,7 +220,7 @@ const updateVideo = asyncHandler(async (req, res) => {
   if (!video) throw new ApiError(401, "Video file is missing!");
 
   if (video?.owner.toString() !== req.user?._id.toString()) {
-    throw new ApiError(400, "Video editing is restricted");
+    throw new ApiError(400, "Updating video detail is restricted");
   }
 
   const thumbnailLocalPath = req.file?.path || "";
@@ -275,7 +277,6 @@ const deleteVideo = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Video deletion is restricted");
   }
   const deleteVideo = await Video.findByIdAndDelete(video?._id);
-  console.log("delete Video:", deleteVideo);
 
   if (!deleteVideo) {
     throw new ApiError(500, "Unable to delete a video in the server.");
@@ -297,8 +298,50 @@ const deleteVideo = asyncHandler(async (req, res) => {
   return res.status(200).json(new ApiResponse(200, {}, "Video is deleted."));
 });
 
+// toggle video publish status
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(401, "Invalid Object ID");
+  }
+
+  const video = await Video.findById(videoId);
+
+  if (!video) throw new ApiError(404, "Video not found");
+
+  if (req.user?._id.toString() !== video?.owner.toString()) {
+    throw new ApiError(400, "Unauthorized request");
+  }
+
+  const toggleVideoPublish = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      $set: {
+        isPublished: !video.isPublished,
+      },
+    },
+    { new: true }
+  );
+
+  console.log(toggleVideoPublish)
+
+  if (!togglePublishStatus) {
+    throw new ApiError(
+      500,
+      "Failed to toggle video publish status in the server"
+    );
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        { isPublished: toggleVideoPublish.isPublished },
+        "Video publish toggled successfully"
+      )
+    );
 });
 
 export {

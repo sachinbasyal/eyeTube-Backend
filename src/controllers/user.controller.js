@@ -41,35 +41,8 @@ const registerUser = asyncHandler(async (req, res) => {
   8. check for user creation
   9. return with response
 */
-  const eraseTempFile = () => {
-    try {
-      fs.unlinkSync(req.files.avatar[0].path);
-      fs.unlinkSync(req.files.coverImage[0].path);
-    } catch (err) {
-      //console.error(err.message);
-      console.log("File(s) deleted from the temp folder!");
-    }
-  };
-
   const { username, fullname, password, email } = req.body;
   // console.log(username); // check in console if the raw data is retrieved..
-
-  // check if the fields are empty
-  if (
-    [username, fullname, password, email].some((field) => field?.trim() === "")
-  ) {
-    eraseTempFile();
-    throw new ApiError(400, "All fields are required");
-  }
-
-  const existedUser = await User.findOne({
-    $or: [{ username }, { email }],
-  }); // findOne() will send the very first matched-data from the db table
-
-  if (existedUser) {
-    eraseTempFile();
-    throw new ApiError(409, "User with username or email already exists");
-  }
 
   const avatarLocalPath = req.files?.avatar?.[0]?.path;
   const coverImageLocalPath = req.files?.coverImage?.[0]?.path; // ensure coverImage exists before trying to access its index
@@ -83,7 +56,34 @@ const registerUser = asyncHandler(async (req, res) => {
     coverImageLocalPath = req.files.coverImage[0].path;
   } // coverImage is optional */
 
+  // check if the fields are empty
+  if (
+    [username, fullname, password, email].some((field) => field?.trim() === "")
+  ) {
+    if(avatarLocalPath) {
+      fs.unlinkSync(avatarLocalPath); // remove the temp. stored file from the local folder
+    }
+    if (coverImageLocalPath) fs.unlinkSync(coverImageLocalPath);
+
+    throw new ApiError(400, "All fields are required");
+  }
+
+  const existedUser = await User.findOne({
+    $or: [{ username }, { email }],
+  }); // findOne() will send the very first matched-data from the db table
+
+  if (existedUser) {
+    // remove the temp. stored file from the local folder
+    if(avatarLocalPath) {
+      fs.unlinkSync(avatarLocalPath); 
+    }
+    if (coverImageLocalPath) fs.unlinkSync(coverImageLocalPath);
+
+    throw new ApiError(409, "User with username or email already exists");
+  }
+
   if (!avatarLocalPath) {
+    if(coverImageLocalPath) fs.unlinkSync(coverImageLocalPath)
     throw new ApiError(400, "Avatar path is missing");
   }
 
@@ -362,11 +362,11 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password -refreshToken");
 
-  if(!user) {
-    throw new ApiError(500, "Error while updating cover image in DB server")
+  if (!user) {
+    throw new ApiError(500, "Error while updating cover image in DB server");
   }
   // delete old avatar image from Cloudinary
-  if(user) {
+  if (user) {
     await deleteAssetCloudinary(oldAvatarURL);
   }
 
@@ -400,12 +400,12 @@ const updateCoverImage = asyncHandler(async (req, res) => {
     { new: true }
   ).select("-password");
 
-  if(!user) {
-    throw new ApiError(500, "Error while updating cover image in DB server")
+  if (!user) {
+    throw new ApiError(500, "Error while updating cover image in DB server");
   }
 
   //delete old cover image from the Cloudinary
-  if(user) {
+  if (user) {
     await deleteAssetCloudinary(oldImageURL);
   }
 
@@ -515,7 +515,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               as: "owner",
               pipeline: [
                 {
-                  $project: {  // overwrite owner field in 'videos' document with projected details
+                  $project: {
+                    // overwrite owner field in 'videos' document with projected details
                     fullname: 1,
                     username: 1,
                     avatar: 1,

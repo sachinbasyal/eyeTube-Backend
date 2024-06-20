@@ -516,7 +516,6 @@ const getWatchHistory = asyncHandler(async (req, res) => {
               pipeline: [
                 {
                   $project: {
-                    // overwrite owner field in 'videos' document with projected details
                     fullname: 1,
                     username: 1,
                     avatar: 1,
@@ -527,8 +526,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
           },
           {
             $addFields: {
-              owner: {
-                $first: "$owner", // getting the first value of owner-array field
+              owner: {  // overwrite owner field in 'videos' document with projected details
+                $first: "$owner", // getting the first value of owner array field 
               },
             },
           },

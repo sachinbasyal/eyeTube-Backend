@@ -10,30 +10,120 @@ import {
 } from "../utils/fileHandling.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose, { isValidObjectId } from "mongoose";
+import fs, { unlinkSync } from "fs";
 
 // get all videos based on query, sort, pagination
 const getAllVideos = asyncHandler(async (req, res) => {
   const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
-  
 
+  const pipeline = [];
+
+  // Match videos based on search query
+  if (query) {
+    pipeline.push({
+      $match: {
+        $or: [
+          { title: { $regex: query, $options: "i" } },
+          { description: { $regex: query, $options: "i" } },
+        ],
+      },
+    });
+  }
+  // Match videos by owner's userId if provided
+  if (userId) {
+    if (!isValidObjectId(userId)) {
+      throw new ApiError(400, "userId is invalid");
+    }
+    pipeline.push({
+      $match: {
+        owner: new mongoose.Types.ObjectId(userId),
+      },
+    });
+  }
+  //sortBy can be views, createdAt, duration
+  //sortType can be ascending(1) or descending(-1)
+  if (sortBy && sortType) {
+    pipeline.push({
+      $sort: {
+        [sortBy]: sortType === "asc" ? 1 : -1,
+      },
+    });
+  } else {
+    pipeline.push({ $sort: { createdAt: -1 } });
+  }
+  // fetch all the videos only that are set isPublished as true
+  pipeline.push({ $match: { isPublished: true } });
+
+  pipeline.push(
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "ownerDetails",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    /* {
+      $addFields: {
+        ownerDetails: {
+          $first: "$ownerDetails",
+        },
+      },
+    }  
+    */ //Alt.
+    {
+      $unwind: "$ownerDetails",
+    }
+  );
+
+  const videoAggregate = Video.aggregate(pipeline); // here, avoid await keyword as we need aggregation pipeline for using aggregatePaginate
+
+  const options = {
+    page: parseInt(page, 10),
+    limit: parseInt(limit, 10),
+    customLabels: {
+      docs: "videos",
+    },
+  };
+
+  const videos = await Video.aggregatePaginate(videoAggregate, options);
+
+  if (!videos) {
+    throw new ApiError(400, "No videos found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
 // get video, upload to cloudinary, publish video
 const publishAVideo = asyncHandler(async (req, res) => {
   const { title, description } = req.body;
 
-  if ([title, description].some((field) => field?.trim() === "")) {
-    throw new ApiError(400, "Both title and description fields are required");
-  }
-
   const videoLocalPath = req.files?.videoFile?.[0]?.path;
   const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path;
+
+  if ([title, description].some((field) => field?.trim() === "")) {
+    if (videoLocalPath) fs.unlinkSync(videoLocalPath);
+    if (thumbnailLocalPath) fs.unlinkSync(thumbnailLocalPath);
+    throw new ApiError(400, "Both title and description fields are required");
+  }
 
   if (!videoLocalPath) {
     throw new ApiError(400, "Video file local path is missing");
   }
 
   if (!thumbnailLocalPath) {
+    if (videoLocalPath) fs.unlinkSync(videoLocalPath);
     throw new ApiError(400, "Thumbnail local path is missing");
   }
 
@@ -134,7 +224,7 @@ const getVideoById = asyncHandler(async (req, res) => {
               username: 1,
               avatar: 1,
               subscribersCount: 1,
-              isSubscribed: 1
+              isSubscribed: 1,
             },
           },
         ],
@@ -172,7 +262,8 @@ const getVideoById = asyncHandler(async (req, res) => {
         duration: 1,
         views: 1,
         isLiked: 1,
-        createdAt: 1
+        createdAt: 1,
+        isPublished: 1,
       },
     },
   ]);
@@ -210,6 +301,7 @@ const updateVideo = asyncHandler(async (req, res) => {
   }
 
   if (!(title && description)) {
+    if (req.file?.path) unlinkSync(req.file.path);
     throw new ApiError(
       400,
       "Title and description fields are required for the updates"
@@ -324,7 +416,7 @@ const togglePublishStatus = asyncHandler(async (req, res) => {
     { new: true }
   );
 
-  console.log(toggleVideoPublish)
+  console.log(toggleVideoPublish);
 
   if (!togglePublishStatus) {
     throw new ApiError(

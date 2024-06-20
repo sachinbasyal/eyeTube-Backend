@@ -84,25 +84,30 @@ const getAllVideos = asyncHandler(async (req, res) => {
     }
   );
 
-  const videoAggregate = Video.aggregate(pipeline); // here, avoid await keyword as we need aggregation pipeline for using aggregatePaginate
-
-  const options = {
-    page: parseInt(page, 10),
-    limit: parseInt(limit, 10),
-    customLabels: {
-      docs: "videos",
-    },
-  };
-
-  const videos = await Video.aggregatePaginate(videoAggregate, options);
-
-  if (!videos) {
-    throw new ApiError(400, "No videos found");
+  try {
+    const videoAggregate = Video.aggregate(pipeline); // here, avoid await keyword as we need aggregation pipeline for using aggregatePaginate
+  
+    const options = {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      customLabels: {
+        docs: "videos",
+      },
+    };
+  
+    const videos = await Video.aggregatePaginate(videoAggregate, options);
+  
+    if (!videos) {
+      throw new ApiError(400, "Video not found");
+    }
+  
+    return res
+      .status(200)
+      .json(new ApiResponse(200, videos, "Videos fetched successfully"));
+  
+  } catch (error) {
+    throw new ApiError(500, "Somethign went wrong while fetching videos")
   }
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
 // get video, upload to cloudinary, publish video

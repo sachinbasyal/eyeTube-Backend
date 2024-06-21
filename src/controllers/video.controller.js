@@ -150,6 +150,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     thumbnail: thumbnail.secure_url,
     duration: videoFile.duration,
     owner: req.user?._id,
+    isPublished:true
   });
 
   const uploadedVideo = await Video.findById(video._id); // Double-check if the video is finally created in MongoDB

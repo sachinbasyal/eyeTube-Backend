@@ -23,12 +23,16 @@ import videoRouter from "./routes/video.route.js"
 import healthcheckRouter from "./routes/healthcheck.route.js"
 import subscriptionRouter from "./routes/subscription.route.js"
 import dashboardRouter from "./routes/dashboard.route.js"
+import tweetRouter from "./routes/tweet.route.js"
+
+
 //routes declaration
 app.use("/api/v1/healthcheck", healthcheckRouter)
 app.use("/api/v1/users", userRouter) // => http://localhost:3000/api/v1/users/route:
 app.use("/api/v1/videos", videoRouter)
 app.use("/api/v1/subscriptions", subscriptionRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
+app.use("/api/v1/tweets", tweetRouter)
 
 
 export {app} 
